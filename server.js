@@ -29,9 +29,32 @@ wss.on('connection', function(ws) {
     ws.close(1002,"Closing connection, can handle at most 2 connections at a time.");
   }
   ws.on('message', function(message) {
-    // Broadcast any received message to all clients
     console.log('received: %s', message);
-    wss.broadcast(message);
+	
+	// Parse the incoming message
+    let data;
+    try {
+        data = JSON.parse(message);
+    } catch (error) {
+        console.error('Invalid JSON', error);
+        return;
+    }
+
+    // Handle different types of messages
+    switch(data.type) {
+        case 'offer':
+            handleOffer(ws, data);
+            break;
+        case 'answer':
+            handleAnswer(ws, data);
+            break;
+        case 'candidate':
+            handleCandidate(ws, data);
+            break;
+        default:
+            console.log('Unknown message type:', data.type);
+            break;
+    }
   });
   ws.on('close', function(code, reason) {
         console.log(`WebSocket connection closed. Code: ${code}, Reason: ${reason}`);
@@ -47,5 +70,35 @@ wss.broadcast = function(data) {
     }
   });
 };
+
+function handleOffer(senderWs, offerData) {
+    // Broadcast offer to all clients except the sender
+    wss.clients.forEach(function(client) {
+        if(client !== senderWs && client.readyState === WebSocket.OPEN) {
+            console.log('Sending offer to a client.');
+            client.send(JSON.stringify(offerData)); // Convert the offerData back to a JSON string
+        }
+    });
+}
+
+function handleAnswer(senderWs, answerData) {
+    // Broadcast answer to all clients except the sender
+    wss.clients.forEach(function(client) {
+        if(client !== senderWs && client.readyState === WebSocket.OPEN) {
+            console.log('Sending answer to the caller.');
+            client.send(JSON.stringify(answerData)); // Convert the answerData back to a JSON string
+        }
+    });
+}
+
+function handleCandidate(senderWs, candidateData) {
+    // Broadcast ICE candidate to all clients except the sender
+    wss.clients.forEach(function(client) {
+        if(client !== senderWs && client.readyState === WebSocket.OPEN) {
+            console.log('Sending ICE candidate to the other peer.');
+            client.send(JSON.stringify(candidateData)); // Convert the candidateData back to a JSON string
+        }
+    });
+}
 
 console.log('Server running. Visit http://localhost:' + HTTP_PORT + '.\n\n');
